@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英雄联盟英雄颜值投票 - 票选各位置最帅&最丑英雄</title>
+  <!-- 引入外部资源 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  
+  <!-- Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // 英雄联盟主题色
+            lol: {
+              dark: '#0F1923',
+              purple: '#7B5CF6',
+              blue: '#165DFF',
+              gold: '#FFD700',
+              red: '#E53E3E',
+              green: '#10B981',
+              gray: '#374151'
+            },
+          },
+          fontFamily: {
+            inter: ['Inter', 'sans-serif'],
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        },
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .hero-card-hover {
+        @apply transition-all duration-300 hover:shadow-lg hover:shadow-lol-purple/20 hover:-translate-y-1;
+      }
+      .vote-btn {
+        @apply px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2;
+      }
+      .tab-active {
+        @apply bg-lol-purple text-white border-lol-purple;
+      }
+    }
+  </style>
+  
+  <style>
+    /* 全局样式 */
+    body {
+      background-color: #0F1923;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(123, 92, 246, 0.05) 0%, transparent 20%),
+        radial-gradient(circle at 90% 80%, rgba(22, 93, 255, 0.05) 0%, transparent 20%);
+      background-attachment: fixed;
+    }
+    
+    /* 滚动条样式 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1A2435;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7B5CF6;
+    }
+    
+    /* 英雄头像加载动画 */
+    .hero-avatar-loading {
+      background: linear-gradient(90deg, #1A2435 25%, #2D3748 50%, #1A2435 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+    }
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+
+<body class="font-inter text-gray-100 min-h-screen">
+  <!-- 顶部导航栏 -->
+  <header class="sticky top-0 z-50 bg-lol-dark/80 backdrop-blur-md border-b border-gray-800 shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center">
+      <div class="flex items-center mb-3 md:mb-0">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/League_of_Legends_Logo.png/600px-League_of_Legends_Logo.png" 
+             alt="英雄联盟Logo" 
+             class="h-10 w-auto mr-3">
+        <h1 class="text-[clamp(1.2rem,3vw,1.8rem)] font-bold bg-clip-text text-transparent bg-gradient-to-r from-lol-purple to-lol-blue">
+          英雄颜值投票
+        </h1>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <button id="reset-votes" class="vote-btn bg-lol-gray hover:bg-lol-red focus:ring-lol-red/50 flex items-center">
+          <i class="fa fa-refresh mr-1"></i> 重置投票
+        </button>
+        <button id="view-results" class="vote-btn bg-lol-purple hover:bg-lol-purple/80 focus:ring-lol-purple/50 flex items-center">
+          <i class="fa fa-bar-chart mr-1"></i> 查看结果
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-4 py-8">
+    <!-- 介绍区域 -->
+    <section class="mb-8 text-center max-w-3xl mx-auto">
+      <h2 class="text-[clamp(1.5rem,3vw,2rem)] font-bold mb-4">票选各位置最帅 & 最丑英雄</h2>
+      <p class="text-gray-400 mb-6">
+        选择你心中每个位置的颜值天花板和地板，投票结果将实时更新并展示
+      </p>
+      
+      <!-- 位置切换标签 -->
+      <div class="flex flex-wrap justify-center gap-2 mb-8">
+        <button class="position-tab tab-active px-4 py-2 rounded-full border transition-all duration-300" data-position="top">
+          上单
+        </button>
+        <button class="position-tab px-4 py-2 rounded-full border border-gray-700 bg-lol-gray/30 hover:bg-lol-gray/50 transition-all duration-300" data-position="jungle">
+          打野
+        </button>
+        <button class="position-tab px-4 py-2 rounded-full border border-gray-700 bg-lol-gray/30 hover:bg-lol-gray/50 transition-all duration-300" data-position="mid">
+          中单
+        </button>
+        <button class="position-tab px-4 py-2 rounded-full border border-gray-700 bg-lol-gray/30 hover:bg-lol-gray/50 transition-all duration-300" data-position="adc">
+          ADC
+        </button>
+        <button class="position-tab px-4 py-2 rounded-full border border-gray-700 bg-lol-gray/30 hover:bg-lol-gray/50 transition-all duration-300" data-position="support">
+          辅助
+        </button>
+      </div>
+    </section>
+    
+    <!-- 投票维度切换 -->
+    <div class="flex justify-center gap-4 mb-6">
+      <button class="vote-type-btn tab-active px-6 py-2 rounded-full border transition-all duration-300" data-type="hottest">
+        <i class="fa fa-fire text-lol-red mr-2"></i>最帅英雄
+      </button>
+      <button class="vote-type-btn px-6 py-2 rounded-full border border-gray-700 bg-lol-gray/30 hover:bg-lol-gray/50 transition-all duration-300" data-type="ugliest">
+        <i class="fa fa-thumbs-down text-gray-500 mr-2"></i>最丑英雄
+      </button>
+    </div>
+    
+    <!-- 英雄列表网格 -->
+    <section id="hero-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+      <!-- 英雄卡片将通过JS动态生成 -->
+    </section>
+    
+    <!-- 结果统计区域 (默认隐藏) -->
+    <section id="results-section" class="mt-12 hidden">
+      <div class="bg-lol-gray/20 rounded-2xl p-6 border border-gray-800">
+        <h3 class="text-xl font-bold mb-6 flex items-center">
+          <i class="fa fa-bar-chart text-lol-purple mr-2"></i>投票结果统计
+        </h3>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <!-- 最帅英雄统计图表 -->
+          <div>
+            <h4 class="text-lg font-semibold mb-4 text-lol-red flex items-center">
+              <i class="fa fa-fire mr-2"></i>各位置最帅英雄
+            </h4>
+            <div class="bg-lol-dark/50 rounded-xl p-4 h-80">
+              <canvas id="hottest-chart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 最丑英雄统计图表 -->
+          <div>
+            <h4 class="text-lg font-semibold mb-4 text-gray-500 flex items-center">
+              <i class="fa fa-thumbs-down mr-2"></i>各位置最丑英雄
+            </h4>
+            <div class="bg-lol-dark/50 rounded-xl p-4 h-80">
+              <canvas id="ugliest-chart"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 详细结果表格 -->
+        <div class="mt-8 overflow-x-auto">
+          <table class="w-full min-w-[640px]">
+            <thead>
+              <tr class="border-b border-gray-800">
+                <th class="py-3 px-4 text-left text-gray-400">位置</th>
+                <th class="py-3 px-4 text-left text-lol-red">最帅英雄 (票数)</th>
+                <th class="py-3 px-4 text-left text-gray-500">最丑英雄 (票数)</th>
+              </tr>
+            </thead>
+            <tbody id="results-table-body">
+              <!-- 结果将通过JS动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="mt-16 bg-lol-dark/80 border-t border-gray-800 py-6">
+    <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+      <p>© 2025 英雄联盟英雄颜值投票 | 数据仅用于娱乐，基于玩家投票生成</p>
+      <p class="mt-2">英雄头像与名称版权归属 Riot Games</p>
+    </div>
+  </footer>
+
+  <!-- 投票成功提示 -->
+  <div id="vote-toast" class="fixed bottom-6 right-6 bg-lol-green/90 text-white px-4 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50">
+    <i class="fa fa-check-circle mr-2"></i>
+    <span>投票成功！</span>
+  </div>
+
+  <script>
+    // 英雄联盟英雄数据 - 按位置分类
+    const lolHeroes = {
+      top: [
+        { id: 'garen', name: '盖伦', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Garen.png' },
+        { id: 'darius', name: '德莱厄斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Darius.png' },
+        { id: 'fiora', name: '菲奥娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Fiora.png' },
+        { id: 'lee-sin', name: '李青', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/LeeSin.png' },
+        { id: 'gnar', name: '纳尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Gnar.png' },
+        { id: 'camille', name: '卡蜜尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Camille.png' },
+        { id: 'ornn', name: '奥恩', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ornn.png' },
+        { id: 'shen', name: '慎', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Shen.png' },
+        { id: 'riven', name: '锐雯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Riven.png' },
+        { id: 'irelia', name: '艾瑞莉娅', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Irelia.png' },
+        { id: 'tryndamere', name: '泰达米尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Tryndamere.png' },
+        { id: 'gangplank', name: '普朗克', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Gangplank.png' },
+        { id: 'mordekaiser', name: '莫德凯撒', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Mordekaiser.png' },
+        { id: 'kayle', name: '凯尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Kayle.png' },
+        { id: 'garen', name: '盖伦', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Garen.png' },
+        { id: 'sett', name: '瑟提', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Sett.png' },
+        { id: 'volibear', name: '沃利贝尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Volibear.png' },
+        { id: 'drmundo', name: '蒙多医生', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/DrMundo.png' },
+        { id: 'poppy', name: '波比', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Poppy.png' },
+        { id: 'gwen', name: '格温', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Gwen.png' }
+      ],
+      jungle: [
+        { id: 'lee-sin', name: '李青', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/LeeSin.png' },
+        { id: 'vi', name: '蔚', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Vi.png' },
+        { id: 'graves', name: '格雷福斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Graves.png' },
+        { id: 'vi', name: '蔚', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Vi.png' },
+        { id: 'nidalee', name: '奈德丽', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Nidalee.png' },
+        { id: 'elise', name: '伊莉丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Elise.png' },
+        { id: 'rengar', name: '雷恩加尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Rengar.png' },
+        { id: 'khazix', name: '卡兹克', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/KhaZix.png' },
+        { id: 'amumu', name: '阿木木', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Amumu.png' },
+        { id: 'warwick', name: '沃里克', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Warwick.png' },
+        { id: 'jarvaniv', name: '嘉文四世', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/JarvanIV.png' },
+        { id: 'shyvana', name: '希瓦娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Shyvana.png' },
+        { id: 'kindred', name: '千珏', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Kindred.png' },
+        { id: 'diana', name: '黛安娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Diana.png' },
+        { id: 'kha-zix', name: '卡兹克', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/KhaZix.png' },
+        { id: 'olaf', name: '奥拉夫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Olaf.png' },
+        { id: 'ivern', name: '艾翁', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ivern.png' },
+        { id: 'belveth', name: '卑尔维斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Belveth.png' },
+        { id: 'viego', name: '佛耶戈', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Viego.png' },
+        { id: 'zed', name: '劫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zed.png' }
+      ],
+      mid: [
+        { id: 'ahri', name: '阿狸', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ahri.png' },
+        { id: 'zed', name: '劫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zed.png' },
+        { id: 'yasuo', name: '亚索', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Yasuo.png' },
+        { id: 'ahri', name: '阿狸', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ahri.png' },
+        { id: 'leblanc', name: '乐芙兰', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Leblanc.png' },
+        { id: 'akali', name: '阿卡丽', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Akali.png' },
+        { id: 'syndra', name: '辛德拉', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Syndra.png' },
+        { id: 'velkoz', name: '维克托', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Velkoz.png' },
+        { id: 'azir', name: '阿兹尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Azir.png' },
+        { id: 'orianna', name: '奥莉安娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Orianna.png' },
+        { id: 'zed', name: '劫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zed.png' },
+        { id: 'katarina', name: '卡特琳娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Katarina.png' },
+        { id: 'diana', name: '黛安娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Diana.png' },
+        { id: 'annie', name: '安妮', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Annie.png' },
+        { id: 'lux', name: '拉克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Lux.png' },
+        { id: 'ziggs', name: '吉格斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ziggs.png' },
+        { id: 'vex', name: '薇古丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Vex.png' },
+        { id: 'zed', name: '劫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zed.png' },
+        { id: 'lillia', name: '莉莉娅', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Lillia.png' },
+        { id: 'zed', name: '劫', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zed.png' }
+      ],
+      adc: [
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'caitlyn', name: '凯特琳', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Caitlyn.png' },
+        { id: 'vi', name: '蔚', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Vi.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'ashe', name: '艾希', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ashe.png' },
+        { id: 'varus', name: '韦鲁斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Varus.png' },
+        { id: 'tristana', name: '崔丝塔娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Tristana.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'ezreal', name: '伊泽瑞尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Ezreal.png' },
+        { id: 'kennen', name: '凯南', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Kennen.png' },
+        { id: 'sivir', name: '希维尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Sivir.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'draven', name: '德莱文', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Draven.png' },
+        { id: 'kalista', name: '卡莉斯塔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Kalista.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'corki', name: '库奇', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Corki.png' },
+        { id: 'samira', name: '萨弥拉', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Samira.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' },
+        { id: 'aphelios', name: '厄斐琉斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Aphelios.png' },
+        { id: 'jinx', name: '金克丝', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Jinx.png' }
+      ],
+      support: [
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'lulu', name: '璐璐', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Lulu.png' },
+        { id: 'sona', name: '娑娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Sona.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'blitzcrank', name: '布里茨', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Blitzcrank.png' },
+        { id: 'braum', name: '布隆', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Braum.png' },
+        { id: 'janna', name: '迦娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Janna.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'alistar', name: '阿利斯塔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Alistar.png' },
+        { id: 'seraphine', name: '赛娜', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Seraphine.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'pyke', name: '派克', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Pyke.png' },
+        { id: 'nautilus', name: '诺提勒斯', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Nautilus.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'lillia', name: '莉莉娅', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Lillia.png' },
+        { id: 'yuumi', name: '悠米', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Yuumi.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'rell', name: '芮尔', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Rell.png' },
+        { id: 'thresh', name: '锤石', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Thresh.png' },
+        { id: 'zilean', name: '基兰', avatar: 'https://ddragon.leagueoflegends.com/cdn/14.21.1/img/champion/Zilean.png' }
+      ]
+    };
+
+    // 位置名称映射
+    const positionNames = {
+      top: '上单',
+      jungle: '打野',
+      mid: '中单',
+      adc: 'ADC',
+      support: '辅助'
+    };
+
+    // 初始化投票数据（从本地存储加载或创建新数据）
+    let voteData = JSON.parse(localStorage.getItem('lolVoteData')) || {
+      hottest: {},
+      ugliest: {}
+    };
+
+    // 当前选中的位置和投票类型
+    let currentPosition = 'top';
+    let currentVoteType = 'hottest';
+
+    // DOM元素
+    const heroGrid = document.getElementById('hero-grid');
+    const positionTabs = document.querySelectorAll('.position-tab');
+    const voteTypeBtns = document.querySelectorAll('.vote-type-btn');
+    const resetVotesBtn = document.getElementById('reset-votes');
+    const viewResultsBtn = document.getElementById('view-results');
+    const resultsSection = document.getElementById('results-section');
+    const voteToast = document.getElementById('vote-toast');
+    const resultsTableBody = document.getElementById('results-table-body');
+
+    // 初始化图表
+    let hottestChart, ugliestChart;
+
+    // 初始化页面
+    function initPage() {
+      renderHeroGrid();
+      initTabs();
+      initCharts();
+      updateResultsTable();
+    }
+
+    // 渲染英雄网格
+    function renderHeroGrid() {
+      heroGrid.innerHTML = '';
+      const heroes = lolHeroes[currentPosition];
+      
+      // 去重并保持顺序
+      const uniqueHeroes = Array.from(new Map(heroes.map(hero => [hero.id, hero])).values());
+      
+      // 根据投票数排序
+      uniqueHeroes.sort((a, b) => {
+        const votesA = voteData[currentVoteType][`${currentPosition}-${a.id}`] || 0;
+        const votesB = voteData[currentVoteType][`${currentPosition}-${b.id}`] || 0;
+        return votesB - votesA;
+      });
+      
+      uniqueHeroes.forEach(hero => {
+        const heroId = `${currentPosition}-${hero.id}`;
+        const votes = voteData[currentVoteType][heroId] || 0;
+        const hasVoted = localStorage.getItem(`lolVoted-${currentVoteType}-${heroId}`) === 'true';
+        
+        const heroCard = document.createElement('div');
+        heroCard.className = 'bg-lol-dark/60 rounded-xl border border-gray-800 overflow-hidden hero-card-hover backdrop-blur-sm';
+        heroCard.innerHTML = `
+          <div class="relative">
+            <img src="${hero.avatar}" 
+                 alt="${hero.name}" 
+                 class="w-full h-48 object-cover hero-avatar-loading"
+                 onload="this.classList.remove('hero-avatar-loading')">
+            <div class="absolute top-2 right-2 bg-lol-dark/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium flex items-center">
+              <i class="fa ${currentVoteType === 'hottest' ? 'fa-fire text-lol-red' : 'fa-thumbs-down text-gray-500'} mr-1"></i>
+              ${votes}票
+            </div>
+          </div>
+          <div class="p-3">
+            <h3 class="font-semibold text-center mb-2">${hero.name}</h3>
+            <button class="vote-btn w-full ${hasVoted ? 
+              (currentVoteType === 'hottest' ? 'bg-lol-red/20 text-lol-red border border-lol-red/30' : 'bg-gray-500/20 text-gray-500 border border-gray-500/30') : 
+              (currentVoteType === 'hottest' ? 'bg-lol-red/10 text-lol-red border border-lol-red/20 hover:bg-lol-red/20' : 'bg-gray-500/10 text-gray-500 border border-gray-500/20 hover:bg-gray-500/20')
+            }" 
+            data-hero-id="${hero.id}" 
+            ${hasVoted ? 'disabled' : ''}>
+              ${hasVoted ? '已投票' : `投${currentVoteType === 'hottest' ? '最帅' : '最丑'}`}
+            </button>
+          </div>
+        `;
+        
+        heroGrid.appendChild(heroCard);
+      });
+      
+      // 添加投票事件监听
+      document.querySelectorAll('.vote-btn[data-hero-id]').forEach(btn => {
+        btn.addEventListener('click', handleVote);
+      });
+    }
+
+    // 处理投票
+    function handleVote(e) {
+      const heroId = e.target.dataset.heroId;
+      const key = `${currentPosition}-${heroId}`;
+      
+      // 记录投票
+      voteData[currentVoteType][key] = (voteData[currentVoteType][key] || 0) + 1;
+      
+      // 标记已投票（防止重复投票）
+      localStorage.setItem(`lolVoted-${currentVoteType}-${key}`, 'true');
+      
+      // 保存到本地存储
+      localStorage.setItem('lolVoteData', JSON.stringify(voteData));
+      
+      // 更新UI
+      renderHeroGrid();
+      updateCharts();
+      updateResultsTable();
+      
+      // 显示提示
+      showVoteToast();
+    }
+
+    // 显示投票提示
+    function showVoteToast() {
+      voteToast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        voteToast.classList.add('translate-y-20', 'opacity-0');
+      }, 2000);
+    }
+
+    // 初始化标签切换
+    function initTabs() {
+      // 位置标签切换
+      positionTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          positionTabs.forEach(t => t.classList.remove('tab-active'));
+          tab.classList.add('tab-active');
+          currentPosition = tab.dataset.position;
+          renderHeroGrid();
+        });
+      });
+      
+      // 投票类型切换
+      voteTypeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          voteTypeBtns.forEach(b => b.classList.remove('tab-active'));
+          btn.classList.add('tab-active');
+          currentVoteType = btn.dataset.type;
+          renderHeroGrid();
+        });
+      });
+      
+      // 重置投票
+      resetVotesBtn.addEventListener('click', () => {
+        if (confirm('确定要重置所有投票数据吗？此操作不可撤销！')) {
+          voteData = { hottest: {}, ugliest: {} };
+          localStorage.removeItem('lolVoteData');
+          
+          // 清除已投票标记
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('lolVoted-')) {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          renderHeroGrid();
+          updateCharts();
+          updateResultsTable();
+        }
+      });
+      
+      // 查看结果
+      viewResultsBtn.addEventListener('click', () => {
+        resultsSection.classList.toggle('hidden');
+        if (!resultsSection.classList.contains('hidden')) {
+          updateCharts();
+          updateResultsTable();
+        }
+      });
+    }
+
+    // 初始化图表
+    function initCharts() {
+      const hottestCtx = document.getElementById('hottest-chart').getContext('2d');
+      const ugliestCtx = document.getElementById('ugliest-chart').getContext('2d');
+      
+      // 图表配置
+      const chartConfig = {
+        type: 'bar',
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 25, 35, 0.9)',
+              borderColor: 'rgba(123, 92, 246, 0.3)',
+              borderWidth: 1,
+              padding: 12,
+              titleFont: {
+                size: 14
+              },
+              bodyFont: {
+                size: 12
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              ticks: {
+                color: '#9CA3AF'
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              ticks: {
+                color: '#9CA3AF',
+                precision: 0
+              }
+            }
+          }
+        }
+      };
+      
+      // 最帅英雄图表
+      hottestChart = new Chart(hottestCtx, {
+        ...chartConfig,
+        data: getChartData('hottest'),
+        options: {
+          ...chartConfig.options,
+          plugins: {
+            ...chartConfig.options.plugins,
+            title: {
+              display: true,
+              text: '各位置最帅英雄投票数',
+              color: '#E53E3E',
+              font: {
+                size: 16,
+                weight: 'bold'
+              },
+              padding: {
+                bottom: 20
+              }
+            }
+          }
+        }
+      });
+      
+      // 最丑英雄图表
+      ugliestChart = new Chart(ugliestCtx, {
+        ...chartConfig,
+        data: getChartData('ugliest'),
+        options: {
+          ...chartConfig.options,
+          plugins: {
+            ...chartConfig.options.plugins,
+            title: {
+              display: true,
+              text: '各位置最丑英雄投票数',
+              color: '#9CA3AF',
+              font: {
+                size: 16,
+                weight: 'bold'
+              },
+              padding: {
+                bottom: 20
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 获取图表数据
+    function getChartData(voteType) {
+      const positions = Object.keys(positionNames);
+      const labels = positions.map(pos => positionNames[pos]);
+      const data = positions.map(pos => {
+        // 获取该位置票数最高的英雄票数
+        const heroes = lolHeroes[pos];
+        const uniqueHeroes = Array.from(new Map(heroes.map(hero => [hero.id, hero])).values());
+        
+        let maxVotes = 0;
+        uniqueHeroes.forEach(hero => {
+          const votes = voteData[voteType][`${pos}-${hero.id}`] || 0;
+          if (votes > maxVotes) {
+            maxVotes = votes;
+          }
+        });
+        
+        return maxVotes;
+      });
+      
+      return {
+        labels: labels,
+        datasets: [{
+          label: '投票数',
+          data: data,
+          backgroundColor: voteType === 'hottest' 
+            ? 'rgba(229, 62, 62, 0.6)' 
+            : 'rgba(156, 163, 175, 0.6)',
+          borderColor: voteType === 'hottest' 
+            ? 'rgba(229, 62, 62, 1)' 
+            : 'rgba(156, 163, 175, 1)',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      };
+    }
+
+    // 更新图表
+    function updateCharts() {
+      if (hottestChart && ugliestChart) {
+        hottestChart.data = getChartData('hottest');
+        ugliestChart.data = getChartData('ugliest');
+        hottestChart.update();
+        ugliestChart.update();
+      }
+    }
+
+    // 更新结果表格
+    function updateResultsTable() {
+      resultsTableBody.innerHTML = '';
+      
+      Object.keys(positionNames).forEach(pos => {
+        const positionName = positionNames[pos];
+        
+        // 找出最帅英雄
+        const hottestHero = getTopHero(pos, 'hottest');
+        // 找出最丑英雄
+        const ugliestHero = getTopHero(pos, 'ugliest');
+        
+        const row = document.createElement('tr');
+        row.className = 'border-b border-gray-800 hover:bg-lol-gray/10 transition-colors';
+        row.innerHTML = `
+          <td class="py-3 px-4 font-medium">${positionName}</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center">
+              <img src="${hottestHero.avatar}" alt="${hottestHero.name}" class="w-8 h-8 rounded-full mr-2 object-cover">
+              <span>${hottestHero.name}</span>
+              <span class="ml-2 text-lol-red">(${hottestHero.votes}票)</span>
+            </div>
+          </td>
+          <td class="py-3 px-4">
+            <div class="flex items-center">
+              <img src="${ugliestHero.avatar}" alt="${ugliestHero.name}" class="w-8 h-8 rounded-full mr-2 object-cover">
+              <span>${ugliestHero.name}</span>
+              <span class="ml-2 text-gray-500">(${ugliestHero.votes}票)</span>
+            </div>
+          </td>
+        `;
+        
+        resultsTableBody.appendChild(row);
+      });
+    }
+
+    // 获取某个位置某种类型的票数最高英雄
+    function getTopHero(position, voteType) {
+      const heroes = lolHeroes[position];
+      const uniqueHeroes = Array.from(new Map(heroes.map(hero => [hero.id, hero])).values());
+      
+      let topHero = uniqueHeroes[0];
+      let maxVotes = 0;
+      
+      uniqueHeroes.forEach(hero => {
+        const votes = voteData[voteType][`${position}-${hero.id}`] || 0;
+        if (votes > maxVotes) {
+          maxVotes = votes;
+          topHero = hero;
+        }
+      });
+      
+      return {
+        ...topHero,
+        votes: maxVotes
+      };
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', initPage);
+  </script>
+</body>
+</html>
